@@ -16,9 +16,20 @@ export default function MealsList({ meals }) {
         {meals.map((meal, index) => (
           <div key={index} className="border-b pb-4 last:border-b-0 last:pb-0">
             <div className="flex justify-between items-start">
-              <div>
-                <p className="font-medium">{meal.description}</p>
-                <p className="text-sm text-gray-500">{formatTime(meal.timestamp)}</p>
+              <div className="flex items-start space-x-3">
+                {meal.imagePreview && (
+                  <div className="flex-shrink-0">
+                    <img 
+                      src={meal.imagePreview} 
+                      alt="Food" 
+                      className="h-16 w-16 object-cover rounded-md"
+                    />
+                  </div>
+                )}
+                <div>
+                  <p className="font-medium">{meal.description}</p>
+                  <p className="text-sm text-gray-500">{formatTime(meal.timestamp)}</p>
+                </div>
               </div>
               <span className="bg-blue-100 text-blue-800 text-sm font-medium px-2.5 py-0.5 rounded">
                 {Math.round(meal.nutrition?.calories || 0)} cal
