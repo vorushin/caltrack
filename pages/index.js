@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import Head from 'next/head';
+import { useRouter } from 'next/router';
 import FoodEntryForm from '../components/FoodEntryForm';
 import ImageUploadForm from '../components/ImageUploadForm';
 import DailyNutritionSummary from '../components/DailyNutritionSummary';
@@ -11,6 +12,7 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState('text'); // 'text' or 'image'
   const [currentDate, setCurrentDate] = useState(new Date().toISOString().split('T')[0]); // YYYY-MM-DD format
   const [debugLog, setDebugLog] = useState([]);
+  const router = useRouter();
 
   // Helper function to add debug logs
   const addDebugLog = (message, data = null) => {
@@ -173,6 +175,21 @@ export default function Home() {
     }) + " Meals";
   };
 
+  // Handle logout
+  const handleLogout = async () => {
+    try {
+      const response = await fetch('/api/auth/logout', {
+        method: 'POST',
+      });
+      
+      if (response.ok) {
+        router.push('/login');
+      }
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+  };
+
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       <Head>
@@ -182,7 +199,15 @@ export default function Home() {
       </Head>
 
       <main>
-        <h1 className="text-3xl font-bold mb-8 text-center">Calorie Tracker</h1>
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-3xl font-bold text-center">Calorie Tracker</h1>
+          <button
+            onClick={handleLogout}
+            className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+          >
+            Logout
+          </button>
+        </div>
         
         {/* Date Selector */}
         <div className="mb-6 flex justify-center">
