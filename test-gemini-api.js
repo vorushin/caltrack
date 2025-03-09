@@ -22,7 +22,7 @@ async function testGeminiAPI() {
     // Initialize the Google Generative AI with your API key
     const genAI = new GoogleGenerativeAI(apiKey);
     
-    // Get the generative model
+    // Get the generative model - using gemini-2.0-flash
     const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
     
     // Simple test prompt
@@ -45,12 +45,20 @@ async function testGeminiAPI() {
     console.log('2. There might be formatting issues with the API key (spaces, quotes, etc.)');
     console.log('3. You might have reached your API quota or rate limits');
     console.log('4. There might be network connectivity issues');
+    console.log('5. The model name might be incorrect or not available to your API key');
     
     if (error.message.includes('API_KEY_INVALID')) {
       console.log('\nThe API key appears to be invalid. Please check that:');
       console.log('- You copied the entire key correctly from AI Studio');
       console.log('- There are no extra spaces or characters');
       console.log('- The key is properly formatted in .env.local (no quotes needed)');
+    }
+    
+    if (error.message.includes('not found for API')) {
+      console.log('\nThe model name appears to be invalid or not available. Please check that:');
+      console.log('- The model name is spelled correctly');
+      console.log('- Your API key has access to this model');
+      console.log('- The model is still available in the Gemini API');
     }
   }
 }

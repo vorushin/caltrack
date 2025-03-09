@@ -25,8 +25,8 @@ export default async function handler(req, res) {
     // Initialize the Google Generative AI with your API key
     const genAI = new GoogleGenerativeAI(apiKey);
 
-    // Get the generative model
-    const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+    // Get the generative model - using gemini-2.0-flash instead of gemini-pro
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
     // Construct the prompt for Gemini
     const prompt = `
@@ -64,7 +64,7 @@ export default async function handler(req, res) {
       nutritionData = JSON.parse(text);
     } catch (e) {
       // If that fails, try to extract JSON from the text
-      const jsonMatch = text.match(/\\{[\\s\\S]*\\}/);
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         nutritionData = JSON.parse(jsonMatch[0]);
       } else {
