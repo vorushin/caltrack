@@ -37,7 +37,7 @@ export default function FoodEntryForm({ addMeal, isLoading, setIsLoading }) {
         timestamp: new Date().toISOString(),
       };
       
-      addMeal(mealWithTimestamp);
+      await addMeal(mealWithTimestamp);
       setFoodDescription('');
     } catch (err) {
       console.error('Error analyzing food:', err);

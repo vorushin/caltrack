@@ -70,7 +70,7 @@ export default function ImageUploadForm({ addMeal, isLoading, setIsLoading }) {
         imagePreview: imagePreview,
       };
 
-      addMeal(mealWithTimestamp);
+      await addMeal(mealWithTimestamp);
       
       // Reset form
       setImage(null);
