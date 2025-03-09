@@ -1,13 +1,55 @@
 import { useState, useRef } from 'react';
 
-export default function ImageUploadForm({ addMeal, isLoading, setIsLoading }) {
+export default function ImageUploadForm({ addMeal, isLoading, setIsLoading, selectedDate }) {
   const [image, setImage] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const [description, setDescription] = useState('');
   const [error, setError] = useState('');
+  const [debugInfo, setDebugInfo] = useState(null);
   const fileInputRef = useRef(null);
 
-  const handleImageChange = (e) => {
+  // Function to resize and compress an image
+  const resizeAndCompressImage = (file, maxWidth = 400, maxHeight = 400, quality = 0.7) => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target.result;
+        img.onload = () => {
+          // Calculate new dimensions while maintaining aspect ratio
+          let width = img.width;
+          let height = img.height;
+          
+          if (width > height) {
+            if (width > maxWidth) {
+              height = Math.round(height * maxWidth / width);
+              width = maxWidth;
+            }
+          } else {
+            if (height > maxHeight) {
+              width = Math.round(width * maxHeight / height);
+              height = maxHeight;
+            }
+          }
+          
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          // Convert to compressed JPEG format
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+          console.log(`Original size: ~${Math.round(file.size / 1024)}KB, Compressed size: ~${Math.round(compressedDataUrl.length / 1024)}KB`);
+          resolve(compressedDataUrl);
+        };
+      };
+    });
+  };
+
+  const handleImageChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
@@ -23,15 +65,30 @@ export default function ImageUploadForm({ addMeal, isLoading, setIsLoading }) {
       return;
     }
 
+    console.log('Image selected:', {
+      name: file.name,
+      type: file.type,
+      size: file.size
+    });
+
     setImage(file);
     setError('');
 
-    // Create a preview
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setImagePreview(reader.result);
-    };
-    reader.readAsDataURL(file);
+    try {
+      // Create a preview with resized and compressed image
+      const compressedImage = await resizeAndCompressImage(file);
+      setImagePreview(compressedImage);
+      console.log('Compressed image preview created');
+    } catch (err) {
+      console.error('Error creating image preview:', err);
+      // Fallback to original method if compression fails
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result);
+        console.log('Original image preview created (compression failed)');
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -43,34 +100,99 @@ export default function ImageUploadForm({ addMeal, isLoading, setIsLoading }) {
     }
 
     setError('');
+    setDebugInfo(null);
     setIsLoading(true);
 
     try {
+      console.log('Starting image upload and analysis');
+      
       // Create a FormData object to send the image and description
       const formData = new FormData();
       formData.append('image', image);
       formData.append('description', description);
 
+      console.log('Sending request to analyze-food-image API');
       const response = await fetch('/api/analyze-food-image', {
         method: 'POST',
         body: formData,
       });
 
+      console.log('Response received:', {
+        status: response.status,
+        ok: response.ok
+      });
+
       if (!response.ok) {
-        throw new Error('Failed to analyze food image');
+        const errorText = await response.text();
+        console.error('API error response:', errorText);
+        throw new Error(`Failed to analyze food image: ${response.status} ${response.statusText}`);
       }
 
       const data = await response.json();
+      console.log('Analysis data received:', data);
+
+      // Create a thumbnail version of the image preview for storage
+      // This ensures the data sent to the API is small enough
+      let thumbnailPreview = imagePreview;
+      
+      // If the image preview is too large, create an even smaller thumbnail
+      if (imagePreview && imagePreview.length > 100 * 1024) { // If larger than 100KB
+        console.log('Image preview too large, creating smaller thumbnail');
+        // Create a temporary image element
+        const img = new Image();
+        img.src = imagePreview;
+        
+        await new Promise((resolve) => {
+          img.onload = () => {
+            // Create a smaller thumbnail (200px max dimension, higher compression)
+            const canvas = document.createElement('canvas');
+            const maxDimension = 200;
+            const ratio = Math.min(maxDimension / img.width, maxDimension / img.height);
+            canvas.width = img.width * ratio;
+            canvas.height = img.height * ratio;
+            
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            
+            // Use higher compression (0.5 quality)
+            thumbnailPreview = canvas.toDataURL('image/jpeg', 0.5);
+            console.log(`Thumbnail created: ~${Math.round(thumbnailPreview.length / 1024)}KB`);
+            resolve();
+          };
+        });
+      }
+
+      // Create a timestamp for the selected date
+      const timestamp = new Date();
+      if (selectedDate) {
+        const selectedDateObj = new Date(selectedDate);
+        // Keep the current time but use the selected date
+        timestamp.setFullYear(selectedDateObj.getFullYear());
+        timestamp.setMonth(selectedDateObj.getMonth());
+        timestamp.setDate(selectedDateObj.getDate());
+      }
 
       // Add timestamp and image preview to the meal data
       const mealWithTimestamp = {
         ...data,
         description: description || 'Food from image',
-        timestamp: new Date().toISOString(),
-        imagePreview: imagePreview,
+        timestamp: timestamp.toISOString(),
+        imagePreview: thumbnailPreview,
+        date: selectedDate // Add the selected date explicitly
       };
 
+      console.log('Prepared meal data for saving:', {
+        description: mealWithTimestamp.description,
+        timestamp: mealWithTimestamp.timestamp,
+        date: mealWithTimestamp.date,
+        hasNutrition: !!mealWithTimestamp.nutrition,
+        hasImagePreview: !!mealWithTimestamp.imagePreview,
+        imagePreviewSize: thumbnailPreview ? Math.round(thumbnailPreview.length / 1024) + 'KB' : 'none'
+      });
+
+      console.log('Calling addMeal function');
       await addMeal(mealWithTimestamp);
+      console.log('addMeal function completed');
       
       // Reset form
       setImage(null);
@@ -81,7 +203,8 @@ export default function ImageUploadForm({ addMeal, isLoading, setIsLoading }) {
       }
     } catch (err) {
       console.error('Error analyzing food image:', err);
-      setError('Failed to analyze food image. Please try again.');
+      setError(`Failed to analyze food image: ${err.message}`);
+      setDebugInfo(JSON.stringify(err, Object.getOwnPropertyNames(err), 2));
     } finally {
       setIsLoading(false);
     }
@@ -167,7 +290,17 @@ export default function ImageUploadForm({ addMeal, isLoading, setIsLoading }) {
           </p>
         </div>
 
-        {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
+        {error && (
+          <div className="text-red-500 text-sm mb-4">
+            <p>{error}</p>
+            {debugInfo && (
+              <details className="mt-2">
+                <summary className="cursor-pointer">Technical Details</summary>
+                <pre className="mt-2 p-2 bg-gray-100 rounded text-xs overflow-auto">{debugInfo}</pre>
+              </details>
+            )}
+          </div>
+        )}
 
         <button
           type="submit"

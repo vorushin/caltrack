@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 
-export default function DailyNutritionSummary({ meals }) {
+export default function DailyNutritionSummary({ meals, date }) {
   const totals = useMemo(() => {
     return meals.reduce(
       (acc, meal) => {
@@ -19,9 +19,36 @@ export default function DailyNutritionSummary({ meals }) {
     return Math.round(num * 10) / 10;
   };
 
+  // Format the date for display
+  const formatDate = (dateString) => {
+    if (!dateString) return '';
+    
+    const date = new Date(dateString);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    // Check if it's today
+    if (date.toDateString() === today.toDateString()) {
+      return "Today";
+    }
+    
+    // Check if it's yesterday
+    if (date.toDateString() === yesterday.toDateString()) {
+      return "Yesterday";
+    }
+    
+    // Otherwise, format the date
+    return date.toLocaleDateString(undefined, { 
+      month: 'short', 
+      day: 'numeric' 
+    });
+  };
+
   return (
     <div>
-      <h2 className="text-xl font-semibold mb-4">Today's Nutrition</h2>
+      <h2 className="text-xl font-semibold mb-1">Nutrition Summary</h2>
+      {date && <p className="text-sm text-gray-500 mb-4">{formatDate(date)}</p>}
       
       <div className="space-y-4">
         <div className="bg-blue-50 p-4 rounded-lg">
@@ -48,7 +75,7 @@ export default function DailyNutritionSummary({ meals }) {
         
         {meals.length === 0 && (
           <p className="text-gray-500 text-sm italic mt-4">
-            No meals added today. Add your first meal to see nutrition totals.
+            No meals added for this day. Add your first meal to see nutrition totals.
           </p>
         )}
       </div>

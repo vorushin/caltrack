@@ -10,6 +10,19 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('text'); // 'text' or 'image'
   const [currentDate, setCurrentDate] = useState(new Date().toISOString().split('T')[0]); // YYYY-MM-DD format
+  const [debugLog, setDebugLog] = useState([]);
+
+  // Helper function to add debug logs
+  const addDebugLog = (message, data = null) => {
+    const timestamp = new Date().toISOString().split('T')[1].split('.')[0]; // HH:MM:SS
+    const logEntry = {
+      timestamp,
+      message,
+      data: data ? JSON.stringify(data) : null
+    };
+    console.log(`[${timestamp}] ${message}`, data || '');
+    setDebugLog(prev => [logEntry, ...prev].slice(0, 20)); // Keep last 20 logs
+  };
 
   // Fetch meals for the current date when the component mounts or date changes
   useEffect(() => {
@@ -20,6 +33,8 @@ export default function Home() {
   const fetchMeals = async () => {
     try {
       setIsLoading(true);
+      addDebugLog(`Fetching meals for date: ${currentDate}`);
+      
       const response = await fetch(`/api/meals?date=${currentDate}`);
       
       if (!response.ok) {
@@ -27,9 +42,11 @@ export default function Home() {
       }
       
       const data = await response.json();
+      addDebugLog(`Fetched ${data.length} meals`, { count: data.length });
       setMeals(data);
     } catch (error) {
       console.error('Error fetching meals:', error);
+      addDebugLog(`Error fetching meals: ${error.message}`, { error: error.toString() });
     } finally {
       setIsLoading(false);
     }
@@ -40,23 +57,60 @@ export default function Home() {
     try {
       setIsLoading(true);
       
+      // Use the selected date instead of the current date
+      const selectedDate = new Date(currentDate);
+      
+      // Create a new timestamp that preserves the time from the original timestamp
+      // but uses the date from the selected date
+      const originalTime = new Date(meal.timestamp);
+      selectedDate.setHours(originalTime.getHours());
+      selectedDate.setMinutes(originalTime.getMinutes());
+      selectedDate.setSeconds(originalTime.getSeconds());
+      
+      // Update the meal with the correct date
+      const mealWithCorrectDate = {
+        ...meal,
+        timestamp: selectedDate.toISOString(),
+        // Add a date field explicitly to ensure it's saved correctly
+        date: currentDate
+      };
+      
+      addDebugLog('Adding new meal with selected date', { 
+        description: mealWithCorrectDate.description,
+        hasNutrition: !!mealWithCorrectDate.nutrition,
+        hasImagePreview: !!mealWithCorrectDate.imagePreview,
+        timestamp: mealWithCorrectDate.timestamp,
+        date: mealWithCorrectDate.date
+      });
+      
       // Save the meal to the database
       const response = await fetch('/api/meals', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(meal),
+        body: JSON.stringify(mealWithCorrectDate),
       });
       
+      addDebugLog(`Save meal API response: ${response.status} ${response.statusText}`);
+      
       if (!response.ok) {
+        const errorText = await response.text();
+        addDebugLog(`Error saving meal: ${errorText}`);
         throw new Error('Failed to save meal');
       }
+      
+      const savedMeal = await response.json();
+      addDebugLog('Meal saved successfully', { 
+        id: savedMeal.id,
+        date: savedMeal.date
+      });
       
       // Refresh the meals list
       await fetchMeals();
     } catch (error) {
       console.error('Error adding meal:', error);
+      addDebugLog(`Error adding meal: ${error.message}`, { error: error.toString() });
     } finally {
       setIsLoading(false);
     }
@@ -66,6 +120,7 @@ export default function Home() {
   const deleteMeal = async (id) => {
     try {
       setIsLoading(true);
+      addDebugLog(`Deleting meal with ID: ${id}`);
       
       const response = await fetch(`/api/meals/${id}`, {
         method: 'DELETE',
@@ -75,10 +130,13 @@ export default function Home() {
         throw new Error('Failed to delete meal');
       }
       
+      addDebugLog('Meal deleted successfully');
+      
       // Refresh the meals list
       await fetchMeals();
     } catch (error) {
       console.error('Error deleting meal:', error);
+      addDebugLog(`Error deleting meal: ${error.message}`);
     } finally {
       setIsLoading(false);
     }
@@ -87,6 +145,32 @@ export default function Home() {
   // Handle date change
   const handleDateChange = (e) => {
     setCurrentDate(e.target.value);
+  };
+
+  // Format the date for display
+  const formatDateForDisplay = (dateString) => {
+    const date = new Date(dateString);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    // Check if it's today
+    if (date.toDateString() === today.toDateString()) {
+      return "Today's Meals";
+    }
+    
+    // Check if it's yesterday
+    if (date.toDateString() === yesterday.toDateString()) {
+      return "Yesterday's Meals";
+    }
+    
+    // Otherwise, format the date
+    return new Date(dateString).toLocaleDateString(undefined, { 
+      weekday: 'long', 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    }) + " Meals";
   };
 
   return (
@@ -143,16 +227,50 @@ export default function Home() {
             
             {/* Tab Content */}
             {activeTab === 'text' ? (
-              <FoodEntryForm addMeal={addMeal} isLoading={isLoading} setIsLoading={setIsLoading} />
+              <FoodEntryForm 
+                addMeal={addMeal} 
+                isLoading={isLoading} 
+                setIsLoading={setIsLoading} 
+                selectedDate={currentDate}
+              />
             ) : (
-              <ImageUploadForm addMeal={addMeal} isLoading={isLoading} setIsLoading={setIsLoading} />
+              <ImageUploadForm 
+                addMeal={addMeal} 
+                isLoading={isLoading} 
+                setIsLoading={setIsLoading}
+                selectedDate={currentDate}
+              />
             )}
             
-            <MealsList meals={meals} onDelete={deleteMeal} isLoading={isLoading} />
+            <MealsList 
+              meals={meals} 
+              onDelete={deleteMeal} 
+              isLoading={isLoading} 
+              title={formatDateForDisplay(currentDate)}
+            />
+            
+            {/* Debug Log (only visible in development) */}
+            {process.env.NODE_ENV === 'development' && debugLog.length > 0 && (
+              <div className="mt-6 bg-gray-100 p-4 rounded-lg">
+                <details>
+                  <summary className="font-medium cursor-pointer">Debug Logs</summary>
+                  <div className="mt-2 text-xs font-mono overflow-auto max-h-60">
+                    {debugLog.map((log, index) => (
+                      <div key={index} className="border-b border-gray-200 py-1">
+                        <span className="text-gray-500">[{log.timestamp}]</span> {log.message}
+                        {log.data && (
+                          <pre className="ml-6 text-gray-600 whitespace-pre-wrap">{log.data}</pre>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              </div>
+            )}
           </div>
           
           <div className="bg-gray-50 p-4 rounded-lg shadow">
-            <DailyNutritionSummary meals={meals} />
+            <DailyNutritionSummary meals={meals} date={currentDate} />
           </div>
         </div>
       </main>

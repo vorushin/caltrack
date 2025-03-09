@@ -1,4 +1,4 @@
-export default function MealsList({ meals, onDelete, isLoading }) {
+export default function MealsList({ meals, onDelete, isLoading, title = "Today's Meals" }) {
   if (meals.length === 0) {
     return (
       <div className="bg-white p-6 rounded-lg shadow text-center text-gray-500">
@@ -14,7 +14,7 @@ export default function MealsList({ meals, onDelete, isLoading }) {
 
   return (
     <div className="bg-white p-6 rounded-lg shadow">
-      <h2 className="text-xl font-semibold mb-4">Today's Meals</h2>
+      <h2 className="text-xl font-semibold mb-4">{title}</h2>
       
       <div className="space-y-4">
         {meals.map((meal) => (

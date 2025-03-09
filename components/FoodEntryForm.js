@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-export default function FoodEntryForm({ addMeal, isLoading, setIsLoading }) {
+export default function FoodEntryForm({ addMeal, isLoading, setIsLoading, selectedDate }) {
   const [foodDescription, setFoodDescription] = useState('');
   const [error, setError] = useState('');
 
@@ -30,11 +30,22 @@ export default function FoodEntryForm({ addMeal, isLoading, setIsLoading }) {
       
       const data = await response.json();
       
+      // Create a timestamp for the selected date
+      const timestamp = new Date();
+      if (selectedDate) {
+        const selectedDateObj = new Date(selectedDate);
+        // Keep the current time but use the selected date
+        timestamp.setFullYear(selectedDateObj.getFullYear());
+        timestamp.setMonth(selectedDateObj.getMonth());
+        timestamp.setDate(selectedDateObj.getDate());
+      }
+      
       // Add timestamp to the meal data
       const mealWithTimestamp = {
         ...data,
         description: foodDescription,
-        timestamp: new Date().toISOString(),
+        timestamp: timestamp.toISOString(),
+        date: selectedDate // Add the selected date explicitly
       };
       
       await addMeal(mealWithTimestamp);
